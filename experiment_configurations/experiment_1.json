@@ -1,0 +1,37 @@
+{
+  "kerasVerbosity": 2,
+  "logDir": "logs/",
+  "mode": "u",
+  "gene": "GM12878",
+  "task": [
+    {"name": "A-E", "labels": ["A-E"]},
+    {"name": "A-P", "labels": ["A-P"]}
+  ],
+  "experiment": "bMLP",
+  "type": "default",
+  "decay": 0.01,
+  "momentum": 0.5,
+  "nesterov": true,
+  "ESPatience": 50,
+  "ESMinDelta": 0.00001,
+  "nExternalHoldout": 10,
+  "samplePerc": 0.2,
+  "epochs": 10,
+  "bayesianOpt": {
+    "nBayesianOptCall": 100,
+    "n_best": 5,
+    "delta": 0.015,
+    "acq_function": "LCB",
+    "hyperparameters": [
+      {"name": "learning_rate", "type": "Real", "low": 0.1, "high": 0.2},
+      {"name": "num_hidden_layer", "type": "Integer", "low": 0, "high": 3}
+    ],
+    "hiddenLayers":  [
+      [2, 4, 8, 16, 32, 64, 128, 256],
+      [2, 4, 8, 16, 32, 64, 128],
+      [2, 4, 8, 16, 32, 64]
+    ],
+    "allowFirstLevelZero": true
+  }
+
+}

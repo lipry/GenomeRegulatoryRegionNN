@@ -1,0 +1,11 @@
+matplotlib
+scikit-learn
+scikit-optimize
+tqdm
+pandas
+biopython
+h5py==2.8.*
+Keras==2.3.*
+numpy==1.14.*
+scipy==1.1.*
+six==1.11.*
