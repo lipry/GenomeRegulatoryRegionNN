@@ -18,7 +18,7 @@ def bayesian_mlp(features_size, hidden_layer_configuration):
 
 
 def train_bayesian_mlp(X_train_int, y_train_int, validation_set, features_size,
-                       learning_rate, num_hidden_layer, hidden_layer_choice, hidden_layers_comb):
+                       hidden_layers_comb, learning_rate, num_hidden_layer, hidden_layer_choice):
     if num_hidden_layer > 0:
         print("num_hidden_layer: ", num_hidden_layer)
         print("hidden_layer_choice: ", hidden_layer_choice)
@@ -45,7 +45,7 @@ def train_bayesian_mlp(X_train_int, y_train_int, validation_set, features_size,
                   optimizer=sgd_opt,
                   metrics=[auprc, auroc])
 
-    es = EarlyStopping(monitor='val_loss', patience=Config.get("ESPatience"), min_delta=Config.get("ESMinDelta"))
+    es = EarlyStopping(monitor='val_loss', patience=Config.get("ESTestPatience"), min_delta=Config.get("ESTestMinDelta"))
 
     history = model.fit(x=X_train_int,
                         y=y_train_int,
@@ -95,7 +95,6 @@ def convolutional1Dstack(units, kernel_size, activation, x, layers=3):
 
 
 def train_fixed_cnn(X_train_int, y_train_int, validation_set, type):
-
     model = fixed_cnn(type)
 
     nadam_opt = Nadam(lr=0.002, beta_1=0.9, beta_2=0.999)
@@ -161,3 +160,11 @@ def train_bayesian_cnn(X_train_int, y_train_int, validation_set, es,
                         verbose=Config.get("kerasVerbosity"))
 
     return model, history
+
+
+def get_training_function(experiment):
+    training_dict = {'bayesianCNN': train_bayesian_cnn,
+                     'bayesianMLP': train_bayesian_mlp,
+                     'fixedCNN': train_fixed_cnn}
+
+    return training_dict[experiment]

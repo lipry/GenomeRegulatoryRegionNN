@@ -1,0 +1,42 @@
+{
+  "kerasVerbosity": 2,
+  "logDir": "logs/",
+  "mode": "u",
+  "gene": "GM12878",
+  "task": [
+    {"name": "A-E", "labels": ["A-E"]},
+    {"name": "A-P", "labels": ["A-P"]}
+  ],
+  "experiment": "bayesianCNN",
+  "decay": 0.01,
+  "momentum": 0.5,
+  "nesterov": true,
+  "ESValPatience": 10,
+  "ESValMinDelta": 0.005,
+  "ESValThresholdBaseline": 0.2,
+  "ESTestPatience": 50,
+  "ESTestMinDelta": 0.00001,
+  "nExternalHoldout": 3,
+  "samplePerc": 0.1,
+  "epochs": 5,
+  "bayesianOpt": {
+    "nBayesianOptCall": 10,
+    "n_best": 5,
+    "delta": 0.015,
+    "acq_function": "LCB",
+    "hyperparameters": [
+      {"name": "kernel_space_1", "type": "Categorical", "categories": [5, 10]},
+      {"name": "units_2", "type": "Categorical", "categories": [32, 64]},
+      {"name": "kernel_space_2", "type": "Categorical", "categories": [5, 10]},
+      {"name": "dense_1", "type": "Categorical", "categories": [32, 64]},
+      {"name": "dense_2", "type": "Categorical", "categories": [32, 64]}
+    ],
+    "hiddenLayers":  [
+      [2, 4, 8, 16, 32, 64, 128, 256],
+      [2, 4, 8, 16, 32, 64, 128],
+      [2, 4, 8, 16, 32, 64]
+    ],
+    "allowFirstLevelZero": true
+  }
+
+}

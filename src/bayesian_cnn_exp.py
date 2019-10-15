@@ -11,11 +11,6 @@ from src.utilities import split, filter_by_tasks, import_sequence_dataset, conf_
 def bayesian_cnn_exp(gene, mode):
     BOconfig = Config.get("bayesianOpt")
     mlp_parameters_space = [conf_to_params(conf) for conf in Config.get("bayesianOpt")["hyperparameters"]]
-    #mlp_parameters_space = [Categorical([5,10], name="kernel_space_1"),
-    #                        Categorical([32, 64], name="units_2"),
-    #                        Categorical([5, 10], name="kernel_space_2"),
-    #                        Categorical([32, 64], name="dense_1"),
-    #                        Categorical([32, 64], name="dense_2")]
 
     @use_named_args(mlp_parameters_space)
     def fitness_mlp(kernel_space_1, units_2, kernel_space_2, dense_1, dense_2):
