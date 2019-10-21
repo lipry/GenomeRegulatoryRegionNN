@@ -1,8 +1,12 @@
+from sklearn.preprocessing import LabelEncoder
+
 from config_loader import Config
 from keras.callbacks import EarlyStopping
 from keras.layers import Input, Dense, Conv1D, MaxPooling1D, GlobalAveragePooling1D, Dropout, Flatten
 from keras.models import Model
 from keras.optimizers import SGD, Nadam
+
+from src.dataset_utils import encoding_labels
 from src.metrics import auprc, auroc
 
 
@@ -17,22 +21,19 @@ def bayesian_mlp(features_size, hidden_layer_configuration):
     return model
 
 
-def train_bayesian_mlp(X_train_int, y_train_int, validation_set, features_size,
+def train_bayesian_mlp(root_logger, X_train_int, y_train_int, X_val, y_val, features_size,
                        hidden_layers_comb, learning_rate, num_hidden_layer, hidden_layer_choice):
     if num_hidden_layer > 0:
-        print("num_hidden_layer: ", num_hidden_layer)
-        print("hidden_layer_choice: ", hidden_layer_choice)
         hidden_layer_choice = int(hidden_layer_choice * len(hidden_layers_comb[num_hidden_layer])
                                   / len(hidden_layers_comb[-1]))
         hidden_layer_configuration = hidden_layers_comb[num_hidden_layer][hidden_layer_choice]
     else:
         hidden_layer_configuration = []
 
-    print('Learning rate: ', learning_rate)
-    print('number of hidden layers: ', num_hidden_layer)
-    # TODO: fix prrint hiddne config
-    print('hidden layesr configuration:', hidden_layer_configuration)
-    print()
+    root_logger.debug("Training with parameters: ")
+    root_logger.debug('Learning rate: {}'.format(learning_rate))
+    root_logger.debug('number of hidden layers: {}'.format(num_hidden_layer))
+    root_logger.debug('hidden layers configuration: {}'.format(hidden_layer_configuration))
 
     model = bayesian_mlp(features_size, hidden_layer_configuration)
 
@@ -47,6 +48,12 @@ def train_bayesian_mlp(X_train_int, y_train_int, validation_set, features_size,
 
     es = EarlyStopping(monitor='val_loss', patience=Config.get("ESTestPatience"), min_delta=Config.get("ESTestMinDelta"))
 
+    validation_set = None
+    if X_val is not None and y_val is not None:
+        y_val = encoding_labels(y_val)
+        validation_set = (X_val, y_val)
+
+    y_train_int = encoding_labels(y_train_int)
     history = model.fit(x=X_train_int,
                         y=y_train_int,
                         validation_data=validation_set,
@@ -94,7 +101,7 @@ def convolutional1Dstack(units, kernel_size, activation, x, layers=3):
     return x
 
 
-def train_fixed_cnn(X_train_int, y_train_int, validation_set, type):
+def train_fixed_cnn(root_logger, X_train_int, y_train_int, X_val, y_val, type):
     model = fixed_cnn(type)
 
     nadam_opt = Nadam(lr=0.002, beta_1=0.9, beta_2=0.999)
@@ -105,6 +112,12 @@ def train_fixed_cnn(X_train_int, y_train_int, validation_set, type):
 
     es = EarlyStopping(monitor='val_loss', patience=Config.get("ESPatience"), min_delta=Config.get("ESMinDelta"))
 
+    validation_set = None
+    if X_val is not None and y_val is not None:
+        y_val = encoding_labels(y_val)
+        validation_set = (X_val, y_val)
+
+    y_train_int = encoding_labels(y_train_int)
     history = model.fit(x=X_train_int,
                         y=y_train_int,
                         validation_data=validation_set,
@@ -136,8 +149,14 @@ def bayesian_cnn(kernel_size_1, units_2, kernel_size_2, dense_units_1, dense_uni
     return model
 
 
-def train_bayesian_cnn(X_train_int, y_train_int, validation_set, es,
+def train_bayesian_cnn(root_logger, X_train_int, y_train_int, X_val, y_val, es,
                        ks1, u2, ks2, d1, d2):
+    root_logger.debug("Kernel space 1: {}".format(ks1))
+    root_logger.debug("Units 2: {}".format(u2))
+    root_logger.debug("Kernel space 2: {}".format(ks2))
+    root_logger.debug("Dense 1: {}".format(d1))
+    root_logger.debug("Dense 2: {}".format(d2))
+
 
     model = bayesian_cnn(kernel_size_1=ks1,
                          units_2=u2,
@@ -151,6 +170,13 @@ def train_bayesian_cnn(X_train_int, y_train_int, validation_set, es,
                   optimizer=nadam_opt,
                   metrics=[auprc, auroc])
 
+    # Building dataset
+    validation_set = None
+    if X_val is not None and y_val is not None:
+        y_val = encoding_labels(y_val)
+        validation_set = (X_val, y_val)
+
+    y_train_int = encoding_labels(y_train_int)
     history = model.fit(x=X_train_int,
                         y=y_train_int,
                         validation_data=validation_set,

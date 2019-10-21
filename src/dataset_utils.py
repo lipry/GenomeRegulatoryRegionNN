@@ -1,23 +1,28 @@
 import random
 import numpy as np
 from Bio import SeqIO
+import logging
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 
 
-def import_epigenetic_dataset(files_path, cell_line):
+def import_epigenetic_dataset(files_path, cell_line, perc=1.0):
     if cell_line not in ["GM12878", "HelaS3", "HepG2", "K562"]:
         raise ValueError("Illegal cell line.")
 
+    logging.debug("Importing epigenetic data of {} cell line".format(cell_line))
     epigenetic_data = np.loadtxt("{}/{}_200bp_Data.txt".format(files_path, cell_line))
 
     with open("{}/{}_200bp_Classes.txt".format(files_path, cell_line), "r") as f:
         labels = np.array([line.strip() for line in f.readlines()])
 
-    return epigenetic_data, labels
+    X, y = subsample_data(epigenetic_data, labels, perc=perc)
+
+    return X, y
 
 
-def import_sequence_dataset(files_path, cell_line):
+def import_sequence_dataset(files_path, cell_line, perc=1.0):
+    logging.debug("Importing sequence data of {} cell line".format(cell_line))
     ltrdict = {'a': [1, 0, 0, 0, 0], 'c': [0, 1, 0, 0, 0],
                'g': [0, 0, 1, 0, 0], 't': [0, 0, 0, 1, 0],
                'n': [0, 0, 0, 0, 1]}
@@ -29,38 +34,60 @@ def import_sequence_dataset(files_path, cell_line):
     with open("{}/{}_200bp_Classes.txt".format(files_path, cell_line), "r") as f:
         labels = np.array([line.strip() for line in f.readlines()])
 
-    return sequences_data, labels
+    X, y = subsample_data(sequences_data, labels, perc=perc)
+
+    return X, y
 
 
-def get_data(experiment, files_path, cell_line):
+def subsample_data(X, y, perc=1.0):
+    n = len(X)
+    indices = np.random.choice(np.arange(0, n), int(n*perc))
+
+    return X[indices], y[indices]
+
+
+def get_data(experiment, files_path, cell_line, perc):
     d = {'bayesianMLP': import_epigenetic_dataset,
          'bayesianCNN': import_sequence_dataset,
          'fixedCNN': import_sequence_dataset}
 
-    return d[experiment](files_path, cell_line)
+    return d[experiment](files_path, cell_line, perc)
 
 
-def filter_by_tasks(X, y, task, perc=1.0):
+def split(X, y, task, random_state=42, test_perc=0.3, proportions=None, mode='u'):
+    if mode not in ['u', 'fb', 'b']:
+        raise ValueError("Illegal mode value")
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_perc, random_state=random_state)
+
+    if mode != 'u':
+        X_train, y_train = downsample_data(X_train, y_train, max_size_given=3000)
+
+    if mode == 'fb':
+        X_test, y_test = resampling_with_proportion(X_test, y_test, proportions)
+
+    X_train, y_train = filter_by_tasks(X_train, y_train, task)
+
+    X_test, y_test = filter_by_tasks(X_test, y_test, task)
+
+    return X_train, X_test, y_train, y_test
+
+
+def filter_by_tasks(X, y, task):
     if len(task) != 2:
         raise ValueError("Illegal task dimension")
 
     new_y = [(i, t["name"]) for t in task for i, label in enumerate(y) if label in t["labels"]]
-    new_y = random.sample(new_y, int(len(new_y)*perc))
-    indices, y = map(list, zip(*new_y))
-
+    res = [[i for i, j in new_y],
+           [j for i, j in new_y]]
+    indices, y = res[0], res[1]
     X = X[indices]
-    print("X: ", len(X))
-    print("y: ", len(y))
-    features_size = len(X[0])
 
-    encoder = LabelEncoder()
-    encoder.fit(y)
-    y = encoder.transform(y)
-
-    return X, y, features_size
+    return X, y
 
 
-def split(X, y, random_state=42, proportions=None, mode='u'):
+# TODO: probably useless
+def split_2(X, y, random_state=42, proportions=None, mode='u'):
     if mode not in ['u', 'fb', 'b']:
         raise ValueError("Illegal mode value")
 
@@ -78,8 +105,8 @@ def split(X, y, random_state=42, proportions=None, mode='u'):
 # TODO: add constant for 7
 # TODO: testing!!!
 def full_balanced_splitting(X, y, test_perc=0.3, random_state=42, proportions=np.array([1, 1, 1, 2, 2, 1, 10])):
-    if len(proportions) is not 7:
-        raise ValueError("proportion length must be 7 (number of classes)")
+    if len(proportions) >= 7:
+        raise ValueError("proportion length must be maximum 7 (number of classes)")
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_perc, random_state=random_state)
     X_train, y_train = downsample_data(X_train, y_train, max_size_given=3000)
@@ -99,6 +126,7 @@ def unbalanced_splitting(X, y, test_perc=0.3, random_state=42):
     return train_test_split(X, y, test_size=test_perc, random_state=random_state)
 
 
+# TODO: fixing replace in sampling
 def get_indices(indices, sample_sizes, n_classes, replace=False):
     indices_range = np.arange(len(indices))
     indices_all = np.concatenate([np.random.choice(indices_range[indices == i],
@@ -137,3 +165,11 @@ def resampling_with_proportion(data, classes, proportions):
     classes = classes[indices_all]
 
     return data, classes
+
+
+def encoding_labels(y):
+    encoder = LabelEncoder()
+    encoder.fit(y)
+    y = encoder.transform(y)
+    return y
+

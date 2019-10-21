@@ -18,14 +18,6 @@ def conf_to_params(c):
     return m[c["type"]](c)
 
 
-def build_log_filename():
-    exp = Config.get("experiment")
-    g = Config.get("gene")
-    m = Config.get("mode")
-    t = "{}vs{}".format(Config.get("task")[0]["name"], Config.get("task")[1]["name"])
-    return "logs/{}_{}_{}_{}_{}_final_metric_log.npy".format(time.strftime("%Y%m%d-%H%M%S"), exp, g, m, t)
-
-
 # Alessandro Code
 def get_hidden_layers_combinations(hidden_layers, max_level=3, allow_empty_first_level=True):
     hiddenLayersList = []

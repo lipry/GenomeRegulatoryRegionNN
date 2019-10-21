@@ -1,23 +1,48 @@
 {
   "kerasVerbosity": 2,
   "logDir": "logs/",
-  "mode": "u",
-  "gene": "GM12878",
-  "task": [
+  "mode": ["fb", "u", "b"],
+  "gene": ["GM12878", "HelaS3", "HepG2", "K562"],
+  "task": [[
     {"name": "A-E", "labels": ["A-E"]},
     {"name": "A-P", "labels": ["A-P"]}
-  ],
-  "experiment": "fixedCNN",
-  "type": "default",
+  ], [
+    {"name": "A-P", "labels": ["A-P"]},
+    {"name": "I-P", "labels": ["I-P"]}
+  ], [
+    {"name": "A-E", "labels": ["A-E"]},
+    {"name": "I-E", "labels": ["I-E"]}
+  ], [
+    {"name": "I-E", "labels": ["I-E"]},
+    {"name": "I-P", "labels": ["I-P"]}
+  ], [
+    {"name": "A-E+A-P", "labels": ["A-E", "A-P"]},
+    {"name": "BG", "labels": ["I-E", "I-P", "UK", "A-X", "I-X"]}
+  ]],
+  "experiment": "bayesianMLP",
   "decay": 0.01,
   "momentum": 0.5,
   "nesterov": true,
-  "ESPatience": 10,
-  "ESMinDelta": 0.005,
-  "ESValThresholdBaseline": 0.2,
   "ESTestPatience": 50,
   "ESTestMinDelta": 0.00001,
   "nExternalHoldout": 3,
-  "samplePerc": 0.1,
-  "epochs": 5
+  "samplePerc": 1.0 ,
+  "epochs": 5,
+  "bayesianOpt": {
+    "nBayesianOptCall": 10,
+    "n_best": 5,
+    "delta": 0.015,
+    "acq_function": "LCB",
+    "hyperparameters": [
+      {"name": "learning_rate", "type": "Real", "low": 0.1, "high": 0.2},
+      {"name": "num_hidden_layer", "type": "Integer", "low": 0, "high": 3}
+    ],
+    "hiddenLayers":  [
+      [2, 4, 8, 16, 32, 64, 128, 256],
+      [2, 4, 8, 16, 32, 64, 128],
+      [2, 4, 8, 16, 32, 64]
+    ],
+    "allowFirstLevelZero": true
+  }
+
 }

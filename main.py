@@ -1,118 +1,113 @@
-import shutil
-import time
+import logging
+
 import numpy as np
 from keras.callbacks import EarlyStopping
 from skopt import gp_minimize
 from skopt.callbacks import DeltaYStopper
-from skopt.utils import use_named_args
 
 from config_loader import Config
-from src.dataset_utils import get_data, filter_by_tasks, split
+from src.dataset_utils import get_data, split, encoding_labels
+from src.logging_utils import save_metrics, copy_experiment_configuration, get_logger
 from src.models import get_training_function
-from src.utilities import get_parameters_space, get_hidden_layers_combinations, build_log_filename
+from src.utilities import get_parameters_space, get_hidden_layers_combinations
 
 if __name__ == "__main__":
     # TODO: manage multiple gene and mode
-    # TODO: manage logging
+    # TODO: TESTING LOGGING
+    # TODO: fixare full balanced
     experiment = Config.get("experiment")
+    genes = Config.get("gene")
+    modes = Config.get("mode")
+    tasks = Config.get("task")
 
-    gene = Config.get("gene")
-    mode = Config.get("mode")
+    for gene in genes:
+        for task in tasks:
+            for mode in modes:
+                root_logger = get_logger(experiment, gene, mode, task)
 
-    training_func = get_training_function(experiment)
+                root_logger.debug("EXPERIMENT: {}, GENE: {}, MODE: {}\nTASK: {}".format(experiment, gene, mode, task))
 
-    if experiment in ['bayesianCNN', 'bayesianMLP']:
-        BOconfig = Config.get("bayesianOpt")
-        mlp_parameters_space = get_parameters_space(experiment, BOconfig)
+                training_func = get_training_function(experiment)
 
-    def fitness(*params):
-        # Preprocessing parameters for different experiments
-        if experiment == "bayesianCNN":
-            es = EarlyStopping(monitor='val_loss', patience=Config.get("ESValPatience"),
-                               min_delta=Config.get("ESValMinDelta"), baseline=Config.get("ESValThresholdBaseline"))
+                if experiment in ['bayesianCNN', 'bayesianMLP']:
+                    BOconfig = Config.get("bayesianOpt")
+                    mlp_parameters_space = get_parameters_space(experiment, BOconfig)
 
-            model, hist = training_func(X_train_int, y_train_int, (X_val, y_val), es, *params[0])
+                def fitness(*params):
+                    # Preprocessing parameters for different experiments
+                    if experiment == "bayesianCNN":
+                        es = EarlyStopping(monitor='val_loss',
+                                           patience=Config.get("ESValPatience"),
+                                           min_delta=Config.get("ESValMinDelta"),
+                                           baseline=Config.get("ESValThresholdBaseline"))
 
-        else:
-            print(*params[0])
-            hidden_layers_comb = get_hidden_layers_combinations(
-                BOconfig["hiddenLayers"], 3, BOconfig["allowFirstLevelZero"])
+                        model, hist = training_func(root_logger, X_train_int, y_train_int, X_val, y_val, es, *params[0])
 
-            model, hist = training_func(X_train_int, y_train_int, (X_val, y_val), features_size, hidden_layers_comb, *params[0])
+                    else:
+                        hidden_layers_comb = get_hidden_layers_combinations(
+                            BOconfig["hiddenLayers"], 3, BOconfig["allowFirstLevelZero"])
 
-        val_auprc = hist.history['val_auprc'][-1]
-        print()
-        print("Validation Loss: {}".format(val_auprc))
-        print()
-        return -val_auprc
+                        model, hist = training_func(root_logger, X_train_int, y_train_int, X_val, y_val, features_size, hidden_layers_comb, *params[0])
 
-    print()
-    print("Importing Epigenetic data...")
-    print()
-    X, y, features_size = filter_by_tasks(*get_data(experiment, "data", gene), Config.get("task"),
-                                          perc=Config.get("samplePerc"))
+                    val_auprc = hist.history['val_auprc'][-1]
+                    root_logger.debug("BAYESIAN OPTIMIZER - Validation auprc: {}".format(val_auprc))
+                    return -val_auprc
 
-    print("Datasets length: {}, {}".format(len(X), len(y)))
-    print("Features sizes: {}".format(features_size))
+                X, y = get_data(experiment, "data", gene, Config.get("samplePerc"))
+                features_size = len(X[0])
 
-    metrics = {'losses': [], 'auprc': [], 'auroc': []}
+                root_logger.debug("Datasets length: {}".format(len(X)))
+                root_logger.debug("Features sizes: {}".format(features_size))
 
-    for ext_holdout in range(Config.get("nExternalHoldout")):
-        print()
-        print("{}/{} EXTERNAL HOLDOUTS".format(ext_holdout, Config.get("nExternalHoldout")))
-        print()
-        X_train, X_test, y_train, y_test = split(X, y, random_state=42, proportions=None, mode=mode)
+                metrics = {'losses': [], 'auprc': [], 'auroc': []}
 
-        if experiment in ['bayesianCNN', 'bayesianMLP']:
-            # Internal holdouts
-            X_train_int, X_val, y_train_int, y_val = split(X_train, y_train, random_state=42, proportions=None, mode=mode)
+                for ext_holdout in range(Config.get("nExternalHoldout")):
+                    root_logger.debug("{}/{} EXTERNAL HOLDOUTS".format(ext_holdout+1, Config.get("nExternalHoldout")))
 
-            print("Searching Parameters...")
-            print()
+                    X_train, X_test, y_train, y_test = split(X, y, task, proportions=np.array([1, 1, 1, 2, 2, 1, 10]),
+                                                             mode=mode)
+                    root_logger.debug("Train size: {}, Test size: {}".format(len(X_train), len(X_test)))
 
-            delta_stopper = DeltaYStopper(n_best=BOconfig["n_best"], delta=BOconfig["delta"])
-            print(BOconfig["nBayesianOptCall"])
-            print(type(BOconfig["nBayesianOptCall"]))
-            min_res = gp_minimize(func=fitness,
-                                  dimensions=mlp_parameters_space,
-                                  acq_func=BOconfig["acq_function"],
-                                  callback=[delta_stopper],
-                                  n_calls=BOconfig["nBayesianOptCall"])
+                    if experiment in ['bayesianCNN', 'bayesianMLP']:
+                        # Internal holdouts, internal holdouts is always unbalaced.
+                        X_train_int, X_val, y_train_int, y_val = split(X_train, y_train, task, random_state=42,
+                                                                       proportions=None, mode='u')
+                        root_logger.debug("Internal Train size: {}, Validation size: {}".format(len(X_train_int), len(X_val)))
 
-            print()
-            print("Training with best parameters found: {}".format(min_res.x))
-            print()
+                        root_logger.debug("BAYESIAN OPTIMIZER - Started to search params")
 
-            print("EXPERIMENT: ", experiment)
-            if experiment == "bayesianMLP":
-                hidden_layers_comb = get_hidden_layers_combinations(
-                    BOconfig["hiddenLayers"], 3, BOconfig["allowFirstLevelZero"])
-                model, _ = training_func(X_train, y_train, None, features_size, hidden_layers_comb, *min_res.x)
-                print(model)
+                        delta_stopper = DeltaYStopper(n_best=BOconfig["n_best"], delta=BOconfig["delta"])
+                        min_res = gp_minimize(func=fitness,
+                                              dimensions=mlp_parameters_space,
+                                              acq_func=BOconfig["acq_function"],
+                                              callback=[delta_stopper],
+                                              n_calls=BOconfig["nBayesianOptCall"])
 
-            if experiment == "bayesianCNN":
-                es = EarlyStopping(monitor='va_auprc', patience=Config.get("ESTestPatience"),
-                                   min_delta=Config.get("ESTestMinDelta"))
-                model, _ = training_func(X_train, y_train, None, es, *min_res.x)
+                        root_logger.debug("BAYESIAN OPTIMIZER - Best parameters found: {}".format(min_res.x))
 
-        else:
-            # fixedCNN need only training
-            model, _ = training_func(X_train, y_train, None, Config.get("type"))
+                        if experiment == "bayesianMLP":
+                            hidden_layers_comb = get_hidden_layers_combinations(
+                                BOconfig["hiddenLayers"], 3, BOconfig["allowFirstLevelZero"])
+                            model, _ = training_func(root_logger, X_train, y_train, None, None, features_size, hidden_layers_comb, *min_res.x)
 
-        print(model)
-        eval_score = model.evaluate(X_test, y_test)
-        # K.clear_session()
+                        if experiment == "bayesianCNN":
+                            es = EarlyStopping(monitor='va_auprc', patience=Config.get("ESTestPatience"),
+                                               min_delta=Config.get("ESTestMinDelta"))
+                            model, _ = training_func(root_logger, X_train, y_train, None, None, es, *min_res.x)
 
-        print("Metrics names: ", model.metrics_names)
-        print("Final Scores: ", eval_score)
-        metrics['losses'].append(eval_score[0])
-        metrics['auprc'].append(eval_score[1])
-        metrics['auroc'].append(eval_score[2])
+                    else:
+                        # fixedCNN need only training
+                        model, _ = training_func(root_logger, X_train, y_train, None, None, Config.get("type"))
 
-    # Saving results metrics
-    np.save(build_log_filename(), metrics)
-    # copying the configuration json file with experiments details
-    dest = "experiment_configurations/{}_{}_{}_experiment_configuration.json".format(
-        time.strftime("%Y%m%d-%H%M%S"), gene, mode
-    )
-    shutil.copy("experiment_configurations/experiment.json", dest)
+                    y_test = encoding_labels(y_test)
+                    eval_score = model.evaluate(X_test, y_test)
+                    # K.clear_session()
+
+                    root_logger.debug("Metrics names: {}".format(model.metrics_names))
+                    root_logger.debug("Final Scores: {}".format(eval_score))
+                    metrics['losses'].append(eval_score[0])
+                    metrics['auprc'].append(eval_score[1])
+                    metrics['auroc'].append(eval_score[2])
+
+                save_metrics(experiment, gene, mode, task, metrics)
+                copy_experiment_configuration(Config.get("gene"), Config.get("mode"))
