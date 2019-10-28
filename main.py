@@ -1,5 +1,3 @@
-import logging
-
 import numpy as np
 from keras.callbacks import EarlyStopping
 from skopt import gp_minimize
@@ -12,10 +10,12 @@ from src.models import get_training_function
 from src.utilities import get_parameters_space, get_hidden_layers_combinations
 
 if __name__ == "__main__":
-    # TODO: manage multiple gene and mode
     # TODO: TESTING LOGGING
     # TODO: fixare full balanced
     experiment = Config.get("experiment")
+
+    root_logger = get_logger(experiment)
+
     genes = Config.get("gene")
     modes = Config.get("mode")
     tasks = Config.get("task")
@@ -23,7 +23,6 @@ if __name__ == "__main__":
     for gene in genes:
         for task in tasks:
             for mode in modes:
-                root_logger = get_logger(experiment, gene, mode, task)
 
                 root_logger.debug("EXPERIMENT: {}, GENE: {}, MODE: {}\nTASK: {}".format(experiment, gene, mode, task))
 

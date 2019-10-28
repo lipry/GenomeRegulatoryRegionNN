@@ -9,3 +9,4 @@ Keras==2.3.*
 numpy==1.14.*
 scipy==1.1.*
 six==1.11.*
+pytest

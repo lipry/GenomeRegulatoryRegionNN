@@ -1,4 +1,4 @@
-import random
+import os
 import numpy as np
 from Bio import SeqIO
 import logging
@@ -10,10 +10,18 @@ def import_epigenetic_dataset(files_path, cell_line, perc=1.0):
     if cell_line not in ["GM12878", "HelaS3", "HepG2", "K562"]:
         raise ValueError("Illegal cell line.")
 
-    logging.debug("Importing epigenetic data of {} cell line".format(cell_line))
-    epigenetic_data = np.loadtxt("{}/{}_200bp_Data.txt".format(files_path, cell_line))
+    epigenetic_data_path = "{}/{}_200bp_Data.txt".format(files_path, cell_line)
+    if not os.path.exists(epigenetic_data_path):
+        raise FileNotFoundError("file {} not found".format(epigenetic_data_path))
 
-    with open("{}/{}_200bp_Classes.txt".format(files_path, cell_line), "r") as f:
+    labels_path = "{}/{}_200bp_Classes.txt".format(files_path, cell_line)
+    if not os.path.exists(labels_path):
+        raise FileNotFoundError("file {} not found".format(labels_path))
+
+    logging.debug("Importing epigenetic data of {} cell line".format(cell_line))
+    epigenetic_data = np.loadtxt(epigenetic_data_path)
+
+    with open(labels_path, "r") as f:
         labels = np.array([line.strip() for line in f.readlines()])
 
     X, y = subsample_data(epigenetic_data, labels, perc=perc)
@@ -22,16 +30,27 @@ def import_epigenetic_dataset(files_path, cell_line, perc=1.0):
 
 
 def import_sequence_dataset(files_path, cell_line, perc=1.0):
+    if cell_line not in ["GM12878", "HelaS3", "HepG2", "K562"]:
+        raise ValueError("Illegal cell line.")
+
+    seqeences_path = "{}/{}.fa".format(files_path, cell_line)
+    if not os.path.exists(seqeences_path):
+        raise FileNotFoundError("file {} not found".format(seqeences_path))
+
+    labels_path = "{}/{}_200bp_Classes.txt".format(files_path, cell_line)
+    if not os.path.exists(labels_path):
+        raise FileNotFoundError("file {} not found".format(labels_path))
+
     logging.debug("Importing sequence data of {} cell line".format(cell_line))
     ltrdict = {'a': [1, 0, 0, 0, 0], 'c': [0, 1, 0, 0, 0],
                'g': [0, 0, 1, 0, 0], 't': [0, 0, 0, 1, 0],
                'n': [0, 0, 0, 0, 1]}
-    with open("{}/{}.fa".format(files_path, cell_line)) as f:
+    with open(seqeences_path) as f:
         fasta_sequences = SeqIO.parse(f, 'fasta')
         sequences_data = np.array([np.array([ltrdict[x]
                                              for x in (str(fasta.seq)).lower()]) for fasta in fasta_sequences])
 
-    with open("{}/{}_200bp_Classes.txt".format(files_path, cell_line), "r") as f:
+    with open(labels_path, "r") as f:
         labels = np.array([line.strip() for line in f.readlines()])
 
     X, y = subsample_data(sequences_data, labels, perc=perc)
@@ -40,10 +59,15 @@ def import_sequence_dataset(files_path, cell_line, perc=1.0):
 
 
 def subsample_data(X, y, perc=1.0):
-    n = len(X)
-    indices = np.random.choice(np.arange(0, n), int(n*perc))
+    if not 0.0 <= perc <= 1.0:
+        raise ValueError("Illegal Percentage")
 
-    return X[indices], y[indices]
+    if perc == 1.0:
+        return X, y
+    else:
+        n = len(X)
+        indices = np.random.choice(np.arange(0, n), int(n*perc))
+        return X[indices], y[indices]
 
 
 def get_data(experiment, files_path, cell_line, perc):
