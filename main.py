@@ -4,14 +4,12 @@ from skopt import gp_minimize
 from skopt.callbacks import DeltaYStopper
 
 from config_loader import Config
-from src.dataset_utils import get_data, split, encoding_labels
+from src.dataset_utils import get_data, split, encoding_labels, filter_by_tasks
 from src.logging_utils import save_metrics, copy_experiment_configuration, get_logger
 from src.models import get_training_function
 from src.utilities import get_parameters_space, get_hidden_layers_combinations
 
 if __name__ == "__main__":
-    # TODO: TESTING LOGGING
-    # TODO: fixare full balanced
     experiment = Config.get("experiment")
 
     root_logger = get_logger(experiment)
@@ -21,6 +19,10 @@ if __name__ == "__main__":
     tasks = Config.get("task")
 
     for gene in genes:
+        root_logger.debug("IMPORTING DATA")
+        X, y = get_data(experiment, "data", gene, Config.get("samplePerc"))
+        features_size = len(X[0])
+
         for task in tasks:
             for mode in modes:
 
@@ -52,25 +54,28 @@ if __name__ == "__main__":
                     root_logger.debug("BAYESIAN OPTIMIZER - Validation auprc: {}".format(val_auprc))
                     return -val_auprc
 
-                X, y = get_data(experiment, "data", gene, Config.get("samplePerc"))
-                features_size = len(X[0])
-
                 root_logger.debug("Datasets length: {}".format(len(X)))
-                root_logger.debug("Features sizes: {}".format(features_size))
 
                 metrics = {'losses': [], 'auprc': [], 'auroc': []}
 
                 for ext_holdout in range(Config.get("nExternalHoldout")):
                     root_logger.debug("{}/{} EXTERNAL HOLDOUTS".format(ext_holdout+1, Config.get("nExternalHoldout")))
 
-                    X_train, X_test, y_train, y_test = split(X, y, task, proportions=np.array([1, 1, 1, 2, 2, 1, 10]),
+                    X_train, X_test, y_train, y_test = split(X, y, proportions=np.array([1, 1, 1, 2, 2, 1, 10]),
                                                              mode=mode)
+                    X_train, y_train = filter_by_tasks(X_train, y_train, task)
+                    X_test, y_test = filter_by_tasks(X_test, y_test, task)
+
                     root_logger.debug("Train size: {}, Test size: {}".format(len(X_train), len(X_test)))
 
                     if experiment in ['bayesianCNN', 'bayesianMLP']:
                         # Internal holdouts, internal holdouts is always unbalaced.
-                        X_train_int, X_val, y_train_int, y_val = split(X_train, y_train, task, random_state=42,
+                        X_train_int, X_val, y_train_int, y_val = split(X_train, y_train, random_state=42,
                                                                        proportions=None, mode='u')
+
+                        X_train_int, y_train_int = filter_by_tasks(X_train_int, y_train_int , task)
+                        X_val, y_val = filter_by_tasks(X_val, y_val, task)
+
                         root_logger.debug("Internal Train size: {}, Validation size: {}".format(len(X_train_int), len(X_val)))
 
                         root_logger.debug("BAYESIAN OPTIMIZER - Started to search params")

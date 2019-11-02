@@ -12,7 +12,7 @@ FROM base as app
 COPY . /app
 
 FROM app AS Test
-RUN pytest tests/ -v
+RUN pytest tests/ -v -s
 
 FROM app AS Develop
 CMD ["python", "main.py"]

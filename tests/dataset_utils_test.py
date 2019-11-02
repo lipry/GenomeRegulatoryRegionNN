@@ -1,10 +1,28 @@
 import random
 import numpy as np
 import pytest
-from src.dataset_utils import import_epigenetic_dataset, import_sequence_dataset, subsample_data, split
+from src.dataset_utils import import_epigenetic_dataset, import_sequence_dataset, subsample_data, split, \
+    filter_by_tasks, downsample_data, resampling_with_proportion
 
 cell_lines = ["GM12878", "HelaS3", "HepG2", "K562"]
+tasks = [[
+    {"name": "A-E", "labels": ["A-E"]},
+    {"name": "A-P", "labels": ["A-P"]}
+  ], [
+    {"name": "A-P", "labels": ["A-P"]},
+    {"name": "I-P", "labels": ["I-P"]}
+  ], [
+    {"name": "A-E", "labels": ["A-E"]},
+    {"name": "I-E", "labels": ["I-E"]}
+  ], [
+    {"name": "I-E", "labels": ["I-E"]},
+    {"name": "I-P", "labels": ["I-P"]}
+  ], [
+    {"name": "A-E+A-P", "labels": ["A-E", "A-P"]},
+    {"name": "BG", "labels": ["I-E", "I-P", "UK", "A-X", "I-X"]}
+  ]]
 
+labels = ["A-E", "I-E", "A-P", "I-P", "A-X", "I-X", "UK"]
 
 @pytest.mark.parametrize('cell_line', cell_lines)
 def test_import_epigenetic_dataset_dim(cell_line):
@@ -51,36 +69,181 @@ def test_import_sequence_dataset_dim(cell_line):
     assert len(y) == 20
 
 
-def generate_random_epigenetic_data(rows=100, col=20):
+def generate_labels_random(rows=100):
+    return np.random.choice(labels, rows)
+
+
+def generate_labels(n_labels_dict):
+    return np.array([k for k, v in n_labels_dict.items() for _ in range(0, v)])
+
+
+def generate_random_epigenetic_data(rows=100, col=20, d=None):
+    if d:
+        rows = sum(d.values())
+
     X = np.array([[random.uniform(0, 30) for _ in range(col)] for _ in range(rows)])
 
-    labels = ["A-E", "I-E", "A-P", "I-P", "A-X", "I-X", "UK"]
-    y = np.array([np.random.choice(labels, col) for _ in range(rows)])
+    if d:
+        y = generate_labels(d)
+    else:
+        y = generate_labels_random(rows=rows)
+
     assert len(X) == len(y)
     assert X.shape == (rows, col)
     return X, y
-    
+
+
+def generate_random_sequence_data(rows=100, seq_len=20, d=None):
+    if d:
+        rows = sum(d.values())
+
+    X = np.array([np.eye(5)[np.random.choice(5, seq_len)] for _ in range(rows)])
+
+    if d:
+        y = generate_labels(d)
+    else:
+        y = generate_labels_random(rows=rows)
+
+    assert len(X) == len(y)
+    assert X.shape == (rows, seq_len, 5)
+    return X, y
+
 
 @pytest.mark.parametrize('perc', [-5, -3, -1, -0.0001, 1.0001, 3, 5, 6])
 def test_subsample_data_wrong_values(perc):
     X, y = generate_random_epigenetic_data()
 
     with pytest.raises(ValueError):
-        subsample_data(X, y, perc=-3)
+        subsample_data(X, y, perc=perc)
 
 
 @pytest.mark.parametrize('perc', np.linspace(0, 1, 11))
 def test_subsample_data_shape(perc):
-    X, y = generate_random_epigenetic_data()
+    rows = 100
+    col = 20
+    X, y = generate_random_epigenetic_data(rows, col)
     X_sampled, y_sampled = subsample_data(X, y, perc=perc)
     assert X_sampled.shape == (int(rows * perc), col)
     assert y_sampled.shape == (int(rows * perc),)
 
 
-def test_filter_task():
-    pass
+@pytest.mark.parametrize('task', tasks)
+def test_filter_task_sequence(task):
+    X, y = generate_random_sequence_data(rows=100, seq_len=20)
+    expected_task = [t['name'] for t in task]
+    new_X, new_y = filter_by_tasks(X, y, task)
 
-#def test_split():
-#    X, y = generating_random_data()
-#    X = split(X, y, task, random_state=42, test_perc=0.3, proportions=None, mode='u')
+    assert all(e in expected_task for e in new_y)
+
+    X, y = generate_random_epigenetic_data(rows=100, col=20)
+    expected_task = [t['name'] for t in task]
+    new_X, new_y = filter_by_tasks(X, y, task)
+
+    assert all(e in expected_task for e in new_y)
+
+
+def count_labels(y):
+    u, indices = np.unique(y, return_inverse=True)
+    return indices, np.bincount(indices)
+
+
+@pytest.mark.parametrize("X, y, max_size", [*[(*generate_random_epigenetic_data(rows=200, col=101), x)
+                                              for x in range(0, 2500, 500)],
+                                            *[(*generate_random_sequence_data(rows=200, seq_len=10), x)
+                                              for x in range(0, 2500, 500)]
+                                            ])
+def test_downsampling_data(X, y, max_size):
+    X_down, y_down = downsample_data(X, y, max_size_given=max_size)
+    indices, counts = count_labels(y_down)
+    if max_size == 0:
+        assert len(indices) == 0
+    else:
+        assert len(set(counts)) <= 1
+        assert counts[0] <= max_size
+
+
+def test_downsampling_data_error():
+    X, y = generate_random_epigenetic_data(rows=200, col=101)
+    with pytest.raises(ValueError):
+        downsample_data(X, y, max_size_given=-3)
+
+
+@pytest.mark.parametrize("task", tasks)
+def test_downsampling_data_filtered(task):
+    X, y = generate_random_epigenetic_data(rows=1000, col=101)
+    X_filtered, y_filtered = filter_by_tasks(X, y, task)
+    X_down, y_down = downsample_data(X_filtered, y_filtered, max_size_given=300)
+    indices, counts = count_labels(y_down)
+    assert len(counts) == 2
+    assert len(set(counts)) <= 1
+    assert counts[0] <= 300
+
+    X, y = generate_random_sequence_data(rows=1000, seq_len=101)
+    X_filtered, y_filtered = filter_by_tasks(X, y, task)
+    X_down, y_down = downsample_data(X_filtered, y_filtered, max_size_given=300)
+    indices, counts = count_labels(y_down)
+    assert len(counts) == 2
+    assert len(set(counts)) <= 1
+    assert counts[0] <= 300
+
+
+@pytest.mark.parametrize("sample_len,prop,expected", [(10, [1, 1, 1, 1, 2, 3, 4], [2, 2, 2, 2, 5, 8, 10]),
+                                                      (10, [1, 1, 1, 1, 1, 1, 1], [10, 10, 10, 10, 10, 10, 10]),
+                                                      (20, [2, 2, 2, 3, 4, 5, 6], [7, 7, 7, 10, 13, 17, 20]),
+                                                      (20, [2, 3, 4, 1, 70, 2, 9], [1, 1, 1, 20, 1, 3])])
+def test_resampling_with_proportion(sample_len, prop, expected):
+    X, y = generate_random_epigenetic_data(rows=100, col=2, d={l: sample_len for l in labels})
+
+    X_resampled, y_resampled = resampling_with_proportion(X, y, proportions=prop)
+    indices, counts = count_labels(y_resampled)
+
+    assert all(a == b for a, b in zip(counts, expected))
+
+
+@pytest.mark.parametrize("sample_len,prop", [(10, [2, 4]),
+                                             (10, [1]),
+                                             (15, [1, 4, 3])])
+def test_resampling_with_proportion_exceptions(sample_len, prop):
+    X, y = generate_random_epigenetic_data(rows=100, col=2, d={l: sample_len for l in labels})
+
+    with pytest.raises(ValueError):
+        resampling_with_proportion(X, y, proportions=prop)
+
+
+
+# @pytest.mark.parametrize("X,y, mode", [#(*generate_random_sequence_data(rows=100, seq_len=20), 'u'),
+#                                        (*generate_random_sequence_data(rows=10000, seq_len=20), 'b')])
+# def test_split(X, y, mode):
+#     task = [{"name": "A-E", "labels": ["A-E"]}, {"name": "A-P", "labels": ["A-P"]}]
+#     perc = 0.3
+#     X_train, X_test, y_train, y_test = split(X, y, task, random_state=42, test_perc=perc, proportions=None, mode=mode)
+#     u, indices = np.unique(y_train, return_inverse=True)
+#     print(np.bincount(indices))
+#
+#     if mode == 'u':
+#         assert len(X_test) == int(len(X) * perc)
+#         assert len(y_test) == int(len(X) * perc)
+#
+#     if mode == 'b':
+#         #print(y_train)
+#         u, indices = np.unique(y_train, return_inverse=True)
+#         print(np.bincount(indices))
+
+# def test_split():
+#     X, y = generate_random_epigenetic_data(rows=20, col=3)
+#     u, indices = np.unique(y, return_inverse=True)
+#     print(y)
+#     print(u)
+#     print(np.bincount(indices))
+#     task = [{"name": "A-E", "labels": ["A-E"]}, {"name": "A-P", "labels": ["A-P"]}]
+#     X_train, X_test, y_train, y_test = split(X, y, task, random_state=42, test_perc=0.3, proportions=None, mode='b')
+#     u, indices = np.unique(y_train, return_inverse=True)
+#     print(y_train)
+#     print(u)
+#     print(np.bincount(indices))
+
+
+
+
+
 

@@ -78,7 +78,8 @@ def get_data(experiment, files_path, cell_line, perc):
     return d[experiment](files_path, cell_line, perc)
 
 
-def split(X, y, task, random_state=42, test_perc=0.3, proportions=None, mode='u'):
+#TODO: testare split
+def split(X, y, random_state=42, test_perc=0.3, proportions=None, mode='u'):
     if mode not in ['u', 'fb', 'b']:
         raise ValueError("Illegal mode value")
 
@@ -86,13 +87,10 @@ def split(X, y, task, random_state=42, test_perc=0.3, proportions=None, mode='u'
 
     if mode != 'u':
         X_train, y_train = downsample_data(X_train, y_train, max_size_given=3000)
+        print(X_train, y_train)
 
     if mode == 'fb':
         X_test, y_test = resampling_with_proportion(X_test, y_test, proportions)
-
-    X_train, y_train = filter_by_tasks(X_train, y_train, task)
-
-    X_test, y_test = filter_by_tasks(X_test, y_test, task)
 
     return X_train, X_test, y_train, y_test
 
@@ -104,50 +102,50 @@ def filter_by_tasks(X, y, task):
     new_y = [(i, t["name"]) for t in task for i, label in enumerate(y) if label in t["labels"]]
     res = [[i for i, j in new_y],
            [j for i, j in new_y]]
-    indices, y = res[0], res[1]
+    indices, y = np.array(res[0]), np.array(res[1])
     X = X[indices]
 
     return X, y
 
 
 # TODO: probably useless
-def split_2(X, y, random_state=42, proportions=None, mode='u'):
-    if mode not in ['u', 'fb', 'b']:
-        raise ValueError("Illegal mode value")
-
-    splitters_dict = {'u': unbalanced_splitting,
-                      'fb': full_balanced_splitting,
-                      'b': balanced_splitting}
-    splitter = splitters_dict[mode]
-
-    if proportions:
-        return splitter(X, y, random_state=random_state, proportions=proportions)
-    else:
-        return splitter(X, y, random_state=random_state)
+# def split_2(X, y, random_state=42, proportions=None, mode='u'):
+#     if mode not in ['u', 'fb', 'b']:
+#         raise ValueError("Illegal mode value")
+#
+#     splitters_dict = {'u': unbalanced_splitting,
+#                       'fb': full_balanced_splitting,
+#                       'b': balanced_splitting}
+#     splitter = splitters_dict[mode]
+#
+#     if proportions:
+#         return splitter(X, y, random_state=random_state, proportions=proportions)
+#     else:
+#         return splitter(X, y, random_state=random_state)
 
 
 # TODO: add constant for 7
 # TODO: testing!!!
-def full_balanced_splitting(X, y, test_perc=0.3, random_state=42, proportions=np.array([1, 1, 1, 2, 2, 1, 10])):
-    if len(proportions) >= 7:
-        raise ValueError("proportion length must be maximum 7 (number of classes)")
-
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_perc, random_state=random_state)
-    X_train, y_train = downsample_data(X_train, y_train, max_size_given=3000)
-    X_test, y_test = resampling_with_proportion(X_test, y_test, proportions)
-
-    return X_train, X_test, y_train, y_test
-
-
-def balanced_splitting(X, y, test_perc=0.3, random_state=42):
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_perc, random_state=random_state)
-    X_train, y_train = downsample_data(X_train, y_train, max_size_given=3000)
-
-    return X_train, X_test, y_train, y_test
-
-
-def unbalanced_splitting(X, y, test_perc=0.3, random_state=42):
-    return train_test_split(X, y, test_size=test_perc, random_state=random_state)
+# def full_balanced_splitting(X, y, test_perc=0.3, random_state=42, proportions=np.array([1, 1, 1, 2, 2, 1, 10])):
+#     if len(proportions) >= 7:
+#         raise ValueError("proportion length must be maximum 7 (number of classes)")
+#
+#     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_perc, random_state=random_state)
+#     X_train, y_train = downsample_data(X_train, y_train, max_size_given=3000)
+#     X_test, y_test = resampling_with_proportion(X_test, y_test, proportions)
+#
+#     return X_train, X_test, y_train, y_test
+#
+#
+# def balanced_splitting(X, y, test_perc=0.3, random_state=42):
+#     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_perc, random_state=random_state)
+#     X_train, y_train = downsample_data(X_train, y_train, max_size_given=3000)
+#
+#     return X_train, X_test, y_train, y_test
+#
+#
+# def unbalanced_splitting(X, y, test_perc=0.3, random_state=42):
+#     return train_test_split(X, y, test_size=test_perc, random_state=random_state)
 
 
 # TODO: fixing replace in sampling
@@ -159,15 +157,17 @@ def get_indices(indices, sample_sizes, n_classes, replace=False):
     return indices_all
 
 
-def downsample_data(data, classes, max_size_given=None):
+def downsample_data(data, classes, max_size_given):
+    if max_size_given < 0:
+        raise ValueError("max_size_given must be greater than 0")
     u, indices = np.unique(classes, return_inverse=True)
     num_u = len(u)
     sample_sizes = np.bincount(indices)
 
-    size_max = np.amax(sample_sizes)
+    size_min = np.amin(sample_sizes)
 
-    if size_max < max_size_given:
-        max_size_given = size_max
+    if size_min < max_size_given:
+        max_size_given = size_min
     sample_sizes[sample_sizes > max_size_given] = max_size_given
 
     indices_all = get_indices(indices, sample_sizes, num_u)
@@ -180,6 +180,10 @@ def downsample_data(data, classes, max_size_given=None):
 def resampling_with_proportion(data, classes, proportions):
     u, indices = np.unique(classes, return_inverse=True)
     num_u = len(u)
+
+    if num_u != len(proportions):
+        raise ValueError("Proportions length doesn't match with number of classes")
+
     index_max_prop = np.argmax(proportions)
     sizes = np.bincount(indices)
     sample_sizes = [int(round(sizes[index_max_prop] * (prop / proportions[index_max_prop]))) for prop in proportions]

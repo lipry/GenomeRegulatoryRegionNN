@@ -5,6 +5,7 @@
 data
 dati-ngs
 logs/*.npy
+logs/*.log
 
 ### macOS ###
 # General
