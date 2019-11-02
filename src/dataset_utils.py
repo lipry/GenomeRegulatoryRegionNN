@@ -78,7 +78,6 @@ def get_data(experiment, files_path, cell_line, perc):
     return d[experiment](files_path, cell_line, perc)
 
 
-#TODO: testare split
 def split(X, y, random_state=42, test_perc=0.3, proportions=None, mode='u'):
     if mode not in ['u', 'fb', 'b']:
         raise ValueError("Illegal mode value")
@@ -87,7 +86,6 @@ def split(X, y, random_state=42, test_perc=0.3, proportions=None, mode='u'):
 
     if mode != 'u':
         X_train, y_train = downsample_data(X_train, y_train, max_size_given=3000)
-        print(X_train, y_train)
 
     if mode == 'fb':
         X_test, y_test = resampling_with_proportion(X_test, y_test, proportions)

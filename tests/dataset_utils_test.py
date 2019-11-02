@@ -24,6 +24,7 @@ tasks = [[
 
 labels = ["A-E", "I-E", "A-P", "I-P", "A-X", "I-X", "UK"]
 
+
 @pytest.mark.parametrize('cell_line', cell_lines)
 def test_import_epigenetic_dataset_dim(cell_line):
     X, y = import_epigenetic_dataset("tests_files", cell_line)
@@ -48,12 +49,11 @@ def test_import_epigenetic_dataset_wrong_values(path, cell_line, perc):
 
 @pytest.mark.parametrize('path', ['f', 'wrong_path', 'wrong/path/to/file'])
 def test_imports_wrong_path(path):
-    # cheking wrong path
     with pytest.raises(FileNotFoundError):
-        import_epigenetic_dataset("f", "GM12878")
+        import_epigenetic_dataset(path, "GM12878")
 
     with pytest.raises(FileNotFoundError):
-        import_sequence_dataset("f", "GM12878")
+        import_sequence_dataset(path, "GM12878")
 
 
 @pytest.mark.parametrize('cell_line', cell_lines)
@@ -210,40 +210,29 @@ def test_resampling_with_proportion_exceptions(sample_len, prop):
         resampling_with_proportion(X, y, proportions=prop)
 
 
+@pytest.mark.parametrize("mode, perc", [('b', 0.3),
+                                        ('u', 0.3),
+                                        ('fb', 0.5)])
+def test_split(mode, perc):
 
-# @pytest.mark.parametrize("X,y, mode", [#(*generate_random_sequence_data(rows=100, seq_len=20), 'u'),
-#                                        (*generate_random_sequence_data(rows=10000, seq_len=20), 'b')])
-# def test_split(X, y, mode):
-#     task = [{"name": "A-E", "labels": ["A-E"]}, {"name": "A-P", "labels": ["A-P"]}]
-#     perc = 0.3
-#     X_train, X_test, y_train, y_test = split(X, y, task, random_state=42, test_perc=perc, proportions=None, mode=mode)
-#     u, indices = np.unique(y_train, return_inverse=True)
-#     print(np.bincount(indices))
-#
-#     if mode == 'u':
-#         assert len(X_test) == int(len(X) * perc)
-#         assert len(y_test) == int(len(X) * perc)
-#
-#     if mode == 'b':
-#         #print(y_train)
-#         u, indices = np.unique(y_train, return_inverse=True)
-#         print(np.bincount(indices))
+    X, y = generate_random_sequence_data(rows=100, seq_len=5, d={l: 40 for l in labels})
 
-# def test_split():
-#     X, y = generate_random_epigenetic_data(rows=20, col=3)
-#     u, indices = np.unique(y, return_inverse=True)
-#     print(y)
-#     print(u)
-#     print(np.bincount(indices))
-#     task = [{"name": "A-E", "labels": ["A-E"]}, {"name": "A-P", "labels": ["A-P"]}]
-#     X_train, X_test, y_train, y_test = split(X, y, task, random_state=42, test_perc=0.3, proportions=None, mode='b')
-#     u, indices = np.unique(y_train, return_inverse=True)
-#     print(y_train)
-#     print(u)
-#     print(np.bincount(indices))
+    X_train, X_test, y_train, y_test = split(X, y, random_state=42, test_perc=perc,
+                                             proportions=[2, 2, 2, 3, 4, 5, 6], mode=mode)
+    u, indices = np.unique(y_train, return_inverse=True)
 
+    if mode == 'u':
+        assert len(X_test) == int(len(X) * perc)
+        assert len(y_test) == int(len(X) * perc)
 
+    if mode == 'b' or mode == 'fb':
+        assert len(X_test) == len(y_test)
+        assert len(X_train) == len(y_train)
 
+        indices, counts = count_labels(y_train)
+        assert len(set(counts)) <= 1
 
-
-
+    if mode == 'fb':
+        expected = [13, 13, 13, 20, 27, 33, 40]
+        indices, counts = count_labels(y_test)
+        all(a == b for a, b in zip(counts, expected))
