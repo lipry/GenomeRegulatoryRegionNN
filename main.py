@@ -4,6 +4,7 @@ from skopt import gp_minimize
 from skopt.callbacks import DeltaYStopper
 
 from config_loader import Config
+from keras import backend as K
 from src.dataset_utils import get_data, split, encoding_labels, filter_by_tasks
 from src.logging_utils import save_metrics, copy_experiment_configuration, get_logger
 from src.models import get_training_function
@@ -50,6 +51,8 @@ if __name__ == "__main__":
 
                         model, hist = training_func(root_logger, X_train_int, y_train_int, X_val, y_val, features_size, hidden_layers_comb, *params[0])
 
+                    del model
+                    K.clear_session()
                     val_auprc = hist.history['val_auprc'][-1]
                     root_logger.debug("BAYESIAN OPTIMIZER - Validation auprc: {}".format(val_auprc))
                     return -val_auprc
@@ -95,7 +98,7 @@ if __name__ == "__main__":
                             model, _ = training_func(root_logger, X_train, y_train, None, None, features_size, hidden_layers_comb, *min_res.x)
 
                         if experiment == "bayesianCNN":
-                            es = EarlyStopping(monitor='va_auprc', patience=Config.get("ESTestPatience"),
+                            es = EarlyStopping(monitor='val_auprc', patience=Config.get("ESTestPatience"),
                                                min_delta=Config.get("ESTestMinDelta"))
                             model, _ = training_func(root_logger, X_train, y_train, None, None, es, *min_res.x)
 
@@ -112,6 +115,8 @@ if __name__ == "__main__":
                     metrics['losses'].append(eval_score[0])
                     metrics['auprc'].append(eval_score[1])
                     metrics['auroc'].append(eval_score[2])
+                    del model
+                    K.clear_session()
 
                 save_metrics(experiment, gene, mode, task, metrics)
                 copy_experiment_configuration(Config.get("gene"), Config.get("mode"))

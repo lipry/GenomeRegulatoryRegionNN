@@ -58,9 +58,9 @@ def train_bayesian_mlp(root_logger, X_train_int, y_train_int, X_val, y_val, feat
                         y=y_train_int,
                         validation_data=validation_set,
                         epochs=Config.get('epochs'),
-                        batch_size=128,
+                        batch_size=Config.get("batchSize"),
                         callbacks=[es],
-                        verbose=Config.get("kerasVerbosity"))
+                        verbose=Config.get("kerasVerbosity"), workers=Config.get("fitWorkers"))
 
     return model, history
 
@@ -122,7 +122,7 @@ def train_fixed_cnn(root_logger, X_train_int, y_train_int, X_val, y_val, type):
                         y=y_train_int,
                         validation_data=validation_set,
                         epochs=Config.get('epochs'),
-                        batch_size=100,
+                        batch_size=Config.get("batchSize"),
                         callbacks=[es],
                         verbose=Config.get("kerasVerbosity"))
 
@@ -157,7 +157,6 @@ def train_bayesian_cnn(root_logger, X_train_int, y_train_int, X_val, y_val, es,
     root_logger.debug("Dense 1: {}".format(d1))
     root_logger.debug("Dense 2: {}".format(d2))
 
-
     model = bayesian_cnn(kernel_size_1=ks1,
                          units_2=u2,
                          kernel_size_2=ks2,
@@ -181,7 +180,7 @@ def train_bayesian_cnn(root_logger, X_train_int, y_train_int, X_val, y_val, es,
                         y=y_train_int,
                         validation_data=validation_set,
                         epochs=Config.get('epochs'),
-                        batch_size=1000,
+                        batch_size=Config.get("batchSize"),
                         callbacks=[es],
                         verbose=Config.get("kerasVerbosity"))
 

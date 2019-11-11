@@ -1,2 +1,0 @@
-2019-10-23 19:00:19,278 — EXPERIMENT: bayesianMLP, GENE: GM12878, MODE: fb
-TASK: [{'name': 'A-E', 'labels': ['A-E']}, {'name': 'A-P', 'labels': ['A-P']}]

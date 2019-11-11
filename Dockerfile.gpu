@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/tensorflow:19.04-py3 as base
+FROM nvcr.io/nvidia/tensorflow:19.04-py3  as base
 RUN apt-get update
 
 WORKDIR /app
@@ -12,7 +12,7 @@ FROM base as app
 COPY . /app
 
 FROM app AS Test
-RUN pytest tests/
+RUN pytest tests/ -v -s
 
 FROM app AS Develop
 CMD ["python", "main.py"]

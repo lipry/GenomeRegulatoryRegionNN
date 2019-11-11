@@ -1,5 +1,7 @@
 {
   "kerasVerbosity": 2,
+  "fitWorkers": 30,
+  "batchSize": 2000,
   "logDir": "logs/",
   "mode": ["fb", "u", "b"],
   "gene": ["GM12878", "HelaS3", "HepG2", "K562"],
@@ -27,9 +29,9 @@
   "ESTestMinDelta": 0.00001,
   "nExternalHoldout": 2,
   "samplePerc": 1.0,
-  "epochs": 10,
+  "epochs": 1000,
   "bayesianOpt": {
-    "nBayesianOptCall": 10,
+    "nBayesianOptCall": 100,
     "n_best": 5,
     "delta": 0.015,
     "acq_function": "LCB",
