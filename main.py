@@ -76,8 +76,9 @@ if __name__ == "__main__":
                         X_train_int, X_val, y_train_int, y_val = split(X_train, y_train, random_state=42,
                                                                        proportions=None, mode='u')
 
-                        X_train_int, y_train_int = filter_by_tasks(X_train_int, y_train_int , task)
-                        X_val, y_val = filter_by_tasks(X_val, y_val, task)
+                        if task[0]['name'] != "A-E+A-P": #TODO: search for a more elegant solution
+                            X_train_int, y_train_int = filter_by_tasks(X_train_int, y_train_int, task)
+                            X_val, y_val = filter_by_tasks(X_val, y_val, task)
 
                         root_logger.debug("Internal Train size: {}, Validation size: {}".format(len(X_train_int), len(X_val)))
 

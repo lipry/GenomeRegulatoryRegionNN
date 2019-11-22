@@ -1,3 +1,4 @@
+from keras.utils import multi_gpu_model
 from sklearn.preprocessing import LabelEncoder
 
 from config_loader import Config
@@ -36,15 +37,16 @@ def train_bayesian_mlp(root_logger, X_train_int, y_train_int, X_val, y_val, feat
     root_logger.debug('hidden layers configuration: {}'.format(hidden_layer_configuration))
 
     model = bayesian_mlp(features_size, hidden_layer_configuration)
+    parallel_model = multi_gpu_model(model, gpus=4)
 
     sgd_opt = SGD(lr=learning_rate,
                   decay=Config.get('decay'),
                   momentum=Config.get('momentum'),
                   nesterov=Config.get('nesterov'))
 
-    model.compile(loss='binary_crossentropy',
-                  optimizer=sgd_opt,
-                  metrics=[auprc, auroc])
+    parallel_model.compile(loss='binary_crossentropy',
+                           optimizer=sgd_opt,
+                           metrics=[auprc, auroc])
 
     es = EarlyStopping(monitor='val_loss', patience=Config.get("ESTestPatience"), min_delta=Config.get("ESTestMinDelta"))
 
@@ -54,15 +56,15 @@ def train_bayesian_mlp(root_logger, X_train_int, y_train_int, X_val, y_val, feat
         validation_set = (X_val, y_val)
 
     y_train_int = encoding_labels(y_train_int)
-    history = model.fit(x=X_train_int,
-                        y=y_train_int,
-                        validation_data=validation_set,
-                        epochs=Config.get('epochs'),
-                        batch_size=Config.get("batchSize"),
-                        callbacks=[es],
-                        verbose=Config.get("kerasVerbosity"), workers=Config.get("fitWorkers"))
+    history = parallel_model.fit(x=X_train_int,
+                                 y=y_train_int,
+                                 validation_data=validation_set,
+                                 epochs=Config.get('epochs'),
+                                 batch_size=Config.get("batchSize"),
+                                 callbacks=[es],
+                                 verbose=Config.get("kerasVerbosity"), workers=Config.get("fitWorkers"))
 
-    return model, history
+    return parallel_model, history
 
 
 def fixed_cnn(type='default'):
@@ -104,7 +106,8 @@ def convolutional1Dstack(units, kernel_size, activation, x, layers=3):
 def train_fixed_cnn(root_logger, X_train_int, y_train_int, X_val, y_val, type):
     model = fixed_cnn(type)
 
-    nadam_opt = Nadam(lr=0.002, beta_1=0.9, beta_2=0.999)
+    #nadam_opt = Nadam(lr=0.002, beta_1=0.9, beta_2=0.999)
+    nadam_opt = Nadam(lr="learningRate", beta_1="nadamBeta1", beta_2="nadamBeta2")
 
     model.compile(loss='binary_crossentropy',
                   optimizer=nadam_opt,
@@ -163,11 +166,13 @@ def train_bayesian_cnn(root_logger, X_train_int, y_train_int, X_val, y_val, es,
                          dense_units_1=d1,
                          dense_units_2=d2)
 
+    parallel_model = multi_gpu_model(model, gpus=4)
+
     nadam_opt = Nadam(lr=0.002, beta_1=0.9, beta_2=0.999)
 
-    model.compile(loss='binary_crossentropy',
-                  optimizer=nadam_opt,
-                  metrics=[auprc, auroc])
+    parallel_model.compile(loss='binary_crossentropy',
+                           optimizer=nadam_opt,
+                           metrics=[auprc, auroc])
 
     # Building dataset
     validation_set = None
@@ -176,15 +181,15 @@ def train_bayesian_cnn(root_logger, X_train_int, y_train_int, X_val, y_val, es,
         validation_set = (X_val, y_val)
 
     y_train_int = encoding_labels(y_train_int)
-    history = model.fit(x=X_train_int,
-                        y=y_train_int,
-                        validation_data=validation_set,
-                        epochs=Config.get('epochs'),
-                        batch_size=Config.get("batchSize"),
-                        callbacks=[es],
-                        verbose=Config.get("kerasVerbosity"))
+    history = parallel_model.fit(x=X_train_int,
+                                 y=y_train_int,
+                                 validation_data=validation_set,
+                                 epochs=Config.get('epochs'),
+                                 batch_size=Config.get("batchSize"),
+                                 callbacks=[es],
+                                 verbose=Config.get("kerasVerbosity"))
 
-    return model, history
+    return parallel_model, history
 
 
 def get_training_function(experiment):

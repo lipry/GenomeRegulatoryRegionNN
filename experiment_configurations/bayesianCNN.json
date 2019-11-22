@@ -1,12 +1,24 @@
 {
   "kerasVerbosity": 2,
   "logDir": "logs/",
-  "mode": "u",
-  "gene": "GM12878",
-  "task": [
+  "mode": ["fb", "u", "b"],
+  "gene": ["GM12878", "HelaS3", "HepG2", "K562"],
+  "task": [[
     {"name": "A-E", "labels": ["A-E"]},
     {"name": "A-P", "labels": ["A-P"]}
-  ],
+  ], [
+    {"name": "A-P", "labels": ["A-P"]},
+    {"name": "I-P", "labels": ["I-P"]}
+  ], [
+    {"name": "A-E", "labels": ["A-E"]},
+    {"name": "I-E", "labels": ["I-E"]}
+  ], [
+    {"name": "I-E", "labels": ["I-E"]},
+    {"name": "I-P", "labels": ["I-P"]}
+  ], [
+    {"name": "A-E+A-P", "labels": ["A-E", "A-P"]},
+    {"name": "BG", "labels": ["I-E", "I-P", "UK", "A-X", "I-X"]}
+  ]],
   "experiment": "bayesianCNN",
   "decay": 0.01,
   "momentum": 0.5,
@@ -14,15 +26,19 @@
   "ESValPatience": 10,
   "ESValMinDelta": 0.005,
   "ESValThresholdBaseline": 0.2,
-  "ESTestPatience": 50,
-  "ESTestMinDelta": 0.00001,
+  "ESTestPatience": 20,
+  "ESTestMinDelta": 0.0001,
   "nExternalHoldout": 3,
-  "samplePerc": 0.1,
-  "epochs": 5,
+  "samplePerc": 1.0,
+  "batchSize": 1000,
+  "epochs": 100,
+  "learningRate": 0.002,
+  "nadamBeta1": 0.9,
+  "nadamBeta2": 0.999,
   "bayesianOpt": {
     "nBayesianOptCall": 10,
     "n_best": 5,
-    "delta": 0.015,
+    "delta": 0.001,
     "acq_function": "LCB",
     "hyperparameters": [
       {"name": "kernel_space_1", "type": "Categorical", "categories": [5, 10]},

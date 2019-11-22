@@ -1,23 +1,37 @@
 {
   "kerasVerbosity": 2,
+  "fitWorkers": 30,
+  "batchSize": 2000,
   "logDir": "logs/",
-  "mode": "u",
-  "gene": "GM12878",
-  "task": [
+  "mode": ["fb", "u", "b"],
+  "gene": ["GM12878", "HelaS3", "HepG2", "K562"],
+  "task": [[
     {"name": "A-E", "labels": ["A-E"]},
     {"name": "A-P", "labels": ["A-P"]}
-  ],
+  ], [
+    {"name": "A-P", "labels": ["A-P"]},
+    {"name": "I-P", "labels": ["I-P"]}
+  ], [
+    {"name": "A-E", "labels": ["A-E"]},
+    {"name": "I-E", "labels": ["I-E"]}
+  ], [
+    {"name": "I-E", "labels": ["I-E"]},
+    {"name": "I-P", "labels": ["I-P"]}
+  ], [
+    {"name": "A-E+A-P", "labels": ["A-E", "A-P"]},
+    {"name": "BG", "labels": ["I-E", "I-P", "UK", "A-X", "I-X"]}
+  ]],
   "experiment": "bayesianMLP",
   "decay": 0.01,
   "momentum": 0.5,
   "nesterov": true,
   "ESTestPatience": 50,
   "ESTestMinDelta": 0.00001,
-  "nExternalHoldout": 3,
-  "samplePerc": 0.1,
-  "epochs": 5,
+  "nExternalHoldout": 2,
+  "samplePerc": 1.0,
+  "epochs": 1000,
   "bayesianOpt": {
-    "nBayesianOptCall": 10,
+    "nBayesianOptCall": 100,
     "n_best": 5,
     "delta": 0.015,
     "acq_function": "LCB",
